@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8">
+    <title>mission 4-5</title>
+  </head>
+  <body>
+    <div id = "omikuji">
+        <img id="omikuji-img" src="0omikuji.jpg" alt="おみくじの写真">
+    </div>
+    <button onclick = "omikujishow()">おみくじを引く</button>
+    <script>
+      function omikujishow(){
+      var omikuji = ["1daikichi.jpg","1chukichi.jpg","1shoukichi.jpg","1suekichi.jpg","1kyou.jpg","1daikyou.jpg"];
+      var number1 = Math.random();
+      var number2 = number1 * 100;
+      var number3 = Math.floor(number2);
+      var number;
+      if (number3 >= 95){
+        number = 0
+      }else if (number3 >= 75){
+        number = 1
+      }else if (number3 >= 50){
+        number = 2
+      }else if (number3 >= 25){
+        number = 3
+      }else if (number3 >= 5){
+        number = 4
+      }else{
+        number = 5
+    }
+      var string = omikuji[number];
+      var object = document.getElementById("omikuji-img");
+      object.src = string;
+      }
+    </script>
+  </body>
+</html>
