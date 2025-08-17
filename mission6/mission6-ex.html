@@ -1,0 +1,261 @@
+<!--↓HTMLのコード-->
+<!DOCTYPE html>
+<!--ドキュメント宣言-->
+<html lang="ja">
+<!--言語指定-->
+  <head>
+<!--裏のページ設定、情報-->
+    <meta charset="UTF-8">
+<!--文字エンコーディングの設定 (meta=ページに関する情報)-->
+    <title>mission6-typingGame</title>
+<!--タブに表示されるタイトル-->
+    <style>
+      body { font-family: sans-serif; }
+      .screen { display: none; }
+      .visible { display: block; }
+      #history-box { margin-top: 30px; }
+    </style>
+<!--CSS(デザインルール)、字体の設定、.screenが付いた要素を非表示に、.visibleが付いた要素を表示に、IDがhistory-boxの要素に余白を空けるスタイル指定-->
+<!--#〇〇:IDが〇〇の要素、margin:要素の外側、mrgin-top:外側でも上側、〇px:何ピクセル分空けるか-->
+  </head>
+  <body>
+<!--実際に見るページの設定-->
+    <textarea id="question-source" style="display: none;"></textarea>
+<!--通常モードの問題を入力する場所-->
+    <h2>TypeLearn</h2>
+<!--見出し-->
+    <div id="start-screen" class="screen visible">
+<!--(ホーム画面)div:区切り(ブロック)、id="":ブロックの名前の識別子、class="":画面に表示する-->
+  <div id="mode-select">
+    <label><input type="radio" name="mode" value="default" checked>通常モード</label>
+    <label><input type="radio" name="mode" value="custom">カスタムモード</label>
+  </div>
+<!--ゲームモード選択のチェック欄-->>
+  <div id="custom-word-input" style="margin: 10px 0;">
+    <input type="text" id="custom-words" placeholder="例: apple, banana, cherry">
+  </div>
+<!--カスタムモードのユーザー入力欄-->
+      <button onclick="startGame()">スタート</button>
+<!--ボタン表示、JSのstartGame()関数を実行する-->
+      <button id="retry-button" onclick="startGame()" style="display:none;">リスタート</button>
+<!--リスタート用のボタン、style=""":非表示に-->
+      <div id="result" style="margin-top:20px;"></div>
+<!--結果を表示(中身はJS内で)-->
+
+      <div id="history-box">
+<!--スコア履歴の表示-->
+        <h3>スコア履歴</h3>
+        <p id="last-score">前回のスコア: 0</p>
+<!--p:段落、id="":前回のスコアを表示する、初期値は0-->
+        <p id="best-score">最高スコア: 0</p>
+<!--上と同様に最高スコアを表示する-->
+      </div>
+    </div>
+
+    <div id="typing-screen" class="screen">
+<!--タイピング画面(ゲーム画面)、最初は非表示-->
+      <p id="timer">残り時間: 30秒</p>
+      <p id="question">問題</p>
+      <p id="input">入力:</p>
+      <p id="score">スコア:0</p>
+      <p id="miss">ミス:0</p>
+    </div>
+<!--↑HTMLのコード-->
+
+<!--↓JSのコード(コメントの設定もJS)-->
+    <script>
+      const questions = [];
+//問題の配列(リスト)、const:定数(書き換えなし)
+      let currentQuestion = "";
+//出題されている単語を""に格納する、let:varと同じ(varは古いらしい)
+      let currentIndex = 0;
+//タイプした位置を示す、文字のチェック
+      let score = 0;
+      let miss = 0;
+//正しいタイプカウント、ミスタイプカウント
+      let timer = 30;
+      let countdown = null;
+//残り時間を記録する変数、カウントダウン処理を入れるための変数、null:セットなし
+      let gameActive = false;
+//ゲームの進行管理、turu/false
+      let startTime= 0;
+//開始時間を記録する変数(ミリ秒単位で記録、経過時間の計算)
+
+      function loadQuestions() {
+        const mode = document.querySelector("input[name='mode']:checked").value;
+        questions.length = 0;
+//選択されているモードに応じた出題単語を読み込む処理、チェックされているモードを取得し代入する、配列をリセット
+        if (mode === "default") {
+          const textData = document.getElementById("question-source").value;
+          textData.split('\n').map(w => w.trim()).filter(Boolean).forEach(w => questions.push(w));
+//デフォルトの場合textareaに書かれた単語を代入、.split('\n'):改行で分割、.map():前後の空白削除、.filter():空文字/行を除外、.forEach():配列に単語を追加
+        } else {
+          const customInput = document.getElementById("custom-words").value;
+          customInput.split(',').map(w => w.trim()).filter(Boolean).forEach(w => questions.push(w));
+//カスタムモードの場合、入力された文字列を取得し代入、customInput以降は上と同様
+        }
+      }
+
+    
+      function showScreen(id) {
+//showScreen関数の定義、idは引数(start/yping-screenを受け取る)
+        document.querySelectorAll('.screen').forEach(el => el.classList.remove('visible'));
+//.screenクラスの要素をすべて取得し、el.classList.remove('visible')ですべてを非表示に、el:各要素
+        document.getElementById(id).classList.add('visible');
+//idで指定した要素を取得し、表示状態に
+      }
+
+      function startGame() {
+//ゲームスタート時に呼び出される関数、状態の初期化/準備
+        loadQuestions();
+        if (questions.length === 0) {
+          alert("単語が設定されていません");
+          return;
+        }
+//問題の取得、入力欄に何もなければアラートを出す
+        currentQuestion = questions[Math.floor(Math.random() * questions.length)];
+//配列からランダムに選びcurrentQuestion代入、Math.random()にリストの長さ(個数)をかけることで問題数分の数字を選べる
+        currentIndex = 0;
+        score = 0;
+        miss = 0;
+        timer = 30;
+//内部状態:入力位置、スコア、ミス、タイマーのリセット
+        gameActive = true;
+//プレイ中
+        startTime = Date.now();
+//現在時刻の取得
+        
+        showScreen('typing-screen');
+//タイピング画面に切り替え
+        document.getElementById("question").textContent = currentQuestion;
+        document.getElementById("input").textContent = "入力: ";
+        document.getElementById("score").textContent = "スコア: 0";
+        document.getElementById("miss").textContent = "ミス: 0";
+        document.getElementById("timer").textContent = `残り時間: ${timer}秒`;
+//画面の見た目:問題の表示(置き換え)、入力欄、スコア、ミス数のリセット、タイマー表示
+
+        clearInterval(countdown);
+//タイマーを止める処理
+        countdown = setInterval(updateTimer, 1000);
+//1000ミリ秒(1秒)毎に実行
+        document.querySelector("button[onclick='startGame()']").style.display = "none";
+        document.getElementById("retry-button").style.display = "none";
+//スタート/リスタートボタンの非表示
+    }
+      function endGame() {
+//ゲーム終了時の処理
+        gameActive = false;
+        clearInterval(countdown);
+//ゲーム終了、カウントダウン停止
+
+        const elapsedSec =(Date.now() - startTime) / 1000;
+        const totalTyped = score + miss;
+        const accuracy = totalTyped === 0 ? 0 : ((score / totalTyped) * 100).toFixed(1);
+        const avgSpeed = elapsedSec === 0 ? 0 :(score / elapsedSec).toFixed(1);
+//ゲーム時間の取得(30秒)、タイプ数の合計、精度計算、タイプ速度計算、(タイプなしで0、toFixed(1)で小数点1桁に)
+        
+        document.getElementById("result").innerHTML = `
+          <h3>ゲーム結果</h3>
+          <p>正答率: ${accuracy}%</p>
+          <p>平均速度: ${avgSpeed}文字/秒</p>
+        `;
+//結果画面の表示処理、id="result"の要素取得、${}に計算結果を表示(.innerHTML=で内容の追加・上書き)
+
+        saveScoreToCookie(score);
+        showScores();
+//スコアをcookieに保存、前回/最高スコアを表示
+        
+        document.getElementById("retry-button").style.display = "";
+        document.querySelector("button[onclick='startGame()']").style.display = "none";
+        showScreen('start-screen');
+//スタート画面に切り替え、スタートボタンの非表示、リスタートボタンの表示
+      }
+
+      document.addEventListener("keydown",function(event) {
+//キーボードが押されたときに反応するイベント
+        if ( !gameActive ) return;
+        const key = event.key;
+//ゲームがtureのとき、入力された文字をkeyに代入
+
+        if (key === currentQuestion[currentIndex]) {
+          currentIndex++;
+          score++;
+//代入された文字が問題の文字と一致しているかのチェック、正しければIndexを次の文字に、スコアに+1
+          document.getElementById("input").textContent = "入力: " + currentQuestion.slice(0, currentIndex);
+//正しく入力した文字列を表示(slie(0,currentIndex):先頭からcurrentIndex番目までを表示する)
+        } else {
+          miss++;
+//入力文字が間違いだった場合missに+1
+        }
+        updateScore();
+//スコアを画面上に表示(更新)する
+
+        if (currentIndex === currentQuestion.length) {
+//入力文字数と問題文字数が同じとき(全て正しく入力されたとき)
+            currentQuestion = questions[Math.floor(Math.random() * questions.length)];
+          currentIndex = 0;
+          document.getElementById("question").textContent = currentQuestion;
+          document.getElementById("input").textContent = "入力: ";
+        }
+      });
+//新しい問題を選び、正しく入力された文字数を0にリセット、新しい問題を表示、入力欄をリセット
+
+      function updateScore() {
+        document.getElementById("score").textContent = `スコア: ${score}`;
+        document.getElementById("miss").textContent = `ミス: ${miss}`;
+      }
+//スコア表示の更新処理、id="score"の要素にテキスト(スコア)を表示する、ミスの表示も同様
+
+      function updateTimer() {
+        timer--;
+        document.getElementById("timer").textContent = `残り時間: ${timer}秒`;
+//タイマーを1秒減らし、画面上のタイマーに反映
+
+        if (timer <= 0) endGame();
+      }
+//タイマーが0になった時endGame()関数を実行
+
+      function saveScoreToCookie() {
+//関数名の定義
+        setCookie("typingLastScore", score, 3);
+//今回のスコアをtypingLastScoreという名前でcookieに保存 、期間3日間
+        const bestScore = parseInt(getCookie("typingBestScore") || "0", 10);
+//過去の最高スコアを取り出す、記録がなければ0、paresInt(...,10):文字列を10進数に変換
+        if (score > bestScore) {
+          setCookie("typingBestScore", score, 3);
+        }
+      }
+//今回のスコアが保存されていた最高スコアより高ければ最高スコアを更新する
+
+      function setCookie(name, value, days) {
+      const d = new Date();
+//関数定義、現在の日時を取得(d:現在の時間と日付の情報をもつオブジェクト)
+      d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
+//記録保存の有効期限の設定
+      const expires = "expires="+ d.toUTCString();
+//cookieが認識できる形式に変更
+      document.cookie = `${name}=${encodeURIComponent(value)}; ${expires}; path=/`;
+    }
+//cookieをブラウザに保存する処理、名前=値の形で保存、有効期限の追加
+
+      function getCookie(name) {
+        const match = document.cookie.match(new RegExp(name + "=([^;]+)"));
+//指定された名前のcookieの値だけを見つけ出す
+        return match ? decodeURIComponent(match[1]) : null; 
+      }
+//cookieが見つかれば値をもとの文字列に変換し返す、見つからなければnullで返す
+
+      function showScores() {
+        const lastScore = getCookie("typingLastScore") || 0;
+        const bestScore = getCookie("typingBestScore") || 0;
+        document.getElementById("last-score").textContent = `前回のスコア: ${lastScore}`;
+        document.getElementById("best-score").textContent = `最高スコア: ${bestScore}`;
+    }
+//前回のスコア、最高スコアをcookieから取得、取得したスコアを代入
+
+    showScores();
+//画面に表示
+    </script>
+<!--↑JavaScriptのコード-->
+  </body>
+</html>

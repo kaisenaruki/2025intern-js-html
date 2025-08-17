@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8">
+    <title>mission6-TypeLearn</title>
+    <style>
+      body { font-family: sans-serif; }
+      .screen { display: none; }
+      .visible { display: block; }
+      #history-box { margin-top: 30px; }
+    </style>  
+  </head>
+
+  <body>
+  <textarea id="question-source" style="display: none;">
+  corporate
+  social
+  responsibility
+  investment
+  sustainable
+  development
+  observe
+  orient
+  decide
+  business
+  continuity
+  management
+  career
+  program
+  human
+  resources
+  technology
+  chief
+  executive
+  officer
+  infomation
+  </textarea>
+
+  <h2>TypeLearn</h2>
+
+  <div id="start-screen" class="screen visible">
+  <div id="mode-select">
+    <label><input type="radio" name="mode" value="default" checked>通常モード</label>
+    <label><input type="radio" name="mode" value="custom">カスタムモード</label>
+  </div>
+
+  <div id="custom-word-input" style="margin: 10px 0;">
+    <input type="text" id="custom-words" placeholder="例: apple, banana, cherry">
+  </div>
+
+      <button onclick="startGame()">スタート</button>
+      <button id="retry-button" onclick="startGame()" style="display:none;">リスタート</button>
+      <div id="result" style="margin-top:20px;"></div>
+      <div id="history-box">
+        <h3>スコア履歴</h3>
+        <p id="last-score">前回のスコア: 0</p>
+        <p id="best-score">最高スコア: 0</p>
+      </div>
+    </div>
+
+    <div id="typing-screen" class="screen">
+      <p id="timer">残り時間: 30秒</p>
+      <p id="question">問題</p>
+      <p id="input">入力:</p>
+      <p id="score">スコア:0</p>
+      <p id="miss">ミス:0</p>
+    </div>
+
+
+    <script>
+      const questions = [];
+      let currentQuestion = "";
+      let currentIndex = 0;
+      let score = 0;
+      let miss = 0;
+      let timer = 30;
+      let countdown = null;
+      let gameActive = false;
+      let startTime= 0;
+
+      function loadQuestions() {
+        const mode = document.querySelector("input[name='mode']:checked").value;
+        questions.length = 0;
+
+        if (mode === "default") {
+          const textData = document.getElementById("question-source").value;
+          textData.split('\n').map(w => w.trim()).filter(Boolean).forEach(w => questions.push(w));
+        } else {
+          const customInput = document.getElementById("custom-words").value;
+          customInput.split(',').map(w => w.trim()).filter(Boolean).forEach(w => questions.push(w));
+
+        }
+      }
+
+      function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(el => el.classList.remove('visible'));
+        document.getElementById(id).classList.add('visible');
+      }
+
+      function startGame() {
+        loadQuestions();
+        if (questions.length === 0) {
+          alert("単語が設定されていません");
+          return;
+        }
+
+        currentQuestion = questions[Math.floor(Math.random() * questions.length)];
+        currentIndex = 0;
+        score = 0;
+        miss = 0;
+        timer = 30;
+        gameActive = true;
+        startTime = Date.now();
+        
+        showScreen('typing-screen');
+        document.getElementById("question").textContent = currentQuestion;
+        document.getElementById("input").textContent = "入力: ";
+        document.getElementById("score").textContent = "スコア: 0";
+        document.getElementById("miss").textContent = "ミス: 0";
+        document.getElementById("timer").textContent = `残り時間: ${timer}秒`;
+
+        clearInterval(countdown);
+        countdown = setInterval(updateTimer, 1000);
+        document.querySelector("button[onclick='startGame()']").style.display = "none";
+        document.getElementById("retry-button").style.display = "none";
+      }
+      function endGame() {
+        gameActive = false;
+        clearInterval(countdown);
+
+        const elapsedSec =(Date.now() - startTime) / 1000;
+        const totalTyped = score + miss;
+        const accuracy = totalTyped === 0 ? 0 : ((score / totalTyped) * 100).toFixed(1);
+        const avgSpeed = elapsedSec === 0 ? 0 :(score / elapsedSec).toFixed(1);
+        
+        document.getElementById("result").innerHTML = `
+          <h3>ゲーム結果</h3>
+          <p>正答率: ${accuracy}%</p>
+          <p>平均速度: ${avgSpeed}文字/秒</p>
+        `;
+
+        saveScoreToCookie(score);
+        showScores();
+        
+        document.getElementById("retry-button").style.display = "inline-block";
+        document.querySelector("button[onclick='startGame()']").style.display = "none";
+        showScreen('start-screen');
+      }
+
+      document.addEventListener("keydown",function(event) {
+        if ( !gameActive ) return;
+        const key = event.key;
+
+        if (key === currentQuestion[currentIndex]) {
+          currentIndex++;
+          score++;
+          document.getElementById("input").textContent = "入力: " + currentQuestion.slice(0, currentIndex);
+        } else {
+          miss++;
+        }
+        updateScore();
+
+        if (currentIndex === currentQuestion.length) {
+          currentQuestion = questions[Math.floor(Math.random() * questions.length)];
+          currentIndex = 0;
+          document.getElementById("question").textContent = currentQuestion;
+          document.getElementById("input").textContent = "入力: ";
+        }
+      });
+
+      function updateScore() {
+        document.getElementById("score").textContent = `スコア: ${score}`;
+        document.getElementById("miss").textContent = `ミス: ${miss}`;
+      }
+
+      function updateTimer() {
+        timer--;
+        document.getElementById("timer").textContent = `残り時間: ${timer}秒`;
+
+        if (timer <= 0) endGame();
+      }
+
+      function saveScoreToCookie() {
+        setCookie("typingLastScore", score, 3);
+        const bestScore = parseInt(getCookie("typingBestScore") || "0", 10);
+        if (score > bestScore) {
+          setCookie("typingBestScore", score, 3);
+        }
+      }
+
+      function setCookie(name, value, days) {
+      const d = new Date();
+      d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
+      const expires = "expires="+ d.toUTCString();
+      document.cookie = `${name}=${encodeURIComponent(value)}; ${expires}; path=/`;
+    }
+
+      function getCookie(name) {
+        const match = document.cookie.match(new RegExp(name + "=([^;]+)"));
+        return match ? decodeURIComponent(match[1]) : null; 
+      }
+
+      function showScores() {
+        const lastScore = getCookie("typingLastScore") || 0;
+        const bestScore = getCookie("typingBestScore") || 0;
+        document.getElementById("last-score").textContent = `前回のスコア: ${lastScore}`;
+        document.getElementById("best-score").textContent = `最高スコア: ${bestScore}`;
+    }
+
+    showScores();
+
+    </script>
+  </body>
+</html>
